@@ -69,3 +69,12 @@ Answer:
     )
 
     return rag_chain
+def load_chatbot():
+
+    llm = ChatGroq(
+        groq_api_key=GROQ_API_KEY,
+        model_name=MODEL_NAME,
+        temperature=0.3,
+    )
+
+    return llm

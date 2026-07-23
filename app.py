@@ -1,5 +1,5 @@
 import streamlit as st
-from rag_pipeline import load_rag_chain
+from rag_pipeline import load_rag_chain, load_chatbot
 from ingest import process_documents
 
 
@@ -88,11 +88,11 @@ else:
 # MAIN PAGE
 # ============================================
 
-st.title("💬 Chat with your Documents")
+st.title("🤖 AI Assistant")
 
 st.caption(
-    "Upload your PDFs and ask questions using Retrieval-Augmented Generation (RAG) powered by Groq."
-)
+    "Chat with AI or upload PDF documents for document-based answers using RAG.")
+
 
 st.markdown("---")
 
@@ -110,8 +110,11 @@ for message in st.session_state.messages:
 # ============================================
 
 question = st.chat_input(
-    "Ask something about your documents..."
+    "Ask me anything... or upload PDF documents for document-based answers."
+
 )
+
+
 
 if question:
 
@@ -127,13 +130,19 @@ if question:
 
     try:
 
-        rag_chain = load_rag_chain()
-
         with st.chat_message("assistant"):
 
             with st.spinner("Thinking..."):
 
-                answer = rag_chain.invoke(question)
+                if st.session_state.documents_processed:
+
+                    rag_chain = load_rag_chain()
+                    answer = rag_chain.invoke(question)
+
+                else:
+
+                    chatbot = load_chatbot()
+                    answer = chatbot.invoke(question).content
 
             st.markdown(answer)
 
