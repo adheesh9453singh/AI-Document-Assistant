@@ -1,18 +1,16 @@
 import streamlit as st
-from rag_pipeline import load_rag_chain, load_chatbot
+
+from agent import ask_agent
 from ingest import process_documents
 
+from ui.theme import load_theme
+from ui.chat import render_chat
 
 # ============================================
-# PAGE CONFIGURATION
+# LOAD THEME
 # ============================================
 
-st.set_page_config(
-    page_title="AI Document Assistant",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+load_theme()
 
 # ============================================
 # SESSION STATE
@@ -30,7 +28,6 @@ if "documents_processed" not in st.session_state:
 
 with st.sidebar:
 
-    st.title("🤖 AI Document Assistant")
 
     st.markdown("---")
 
@@ -39,32 +36,38 @@ with st.sidebar:
     uploaded_files = st.file_uploader(
         "Choose PDF file(s)",
         type=["pdf"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
     )
 
     process_button = st.button(
         "🚀 Process Documents",
-        use_container_width=True
+        use_container_width=True,
     )
 
-    # ============================================
-# PROCESS DOCUMENTS BUTTON
+    st.markdown("---")
+
+    st.subheader("📊 Status")
+
+    if st.session_state.documents_processed:
+        st.success("✅ Documents Ready")
+    else:
+        st.warning("⚠️ No Documents Processed")
+
 # ============================================
-
-
+# PROCESS DOCUMENTS
+# ============================================
 
 if process_button:
 
     if uploaded_files:
 
-        with st.spinner("📄 Processing documents... Please wait"):
+        with st.spinner("📄 Processing documents..."):
 
             success = process_documents(uploaded_files)
 
             if success:
                 st.session_state.documents_processed = True
                 st.success("✅ Documents processed successfully!")
-
             else:
                 st.error("❌ Failed to process documents.")
 
@@ -72,87 +75,75 @@ if process_button:
         st.error("⚠️ Please upload at least one PDF.")
 
 # ============================================
-# STATUS
-# ============================================
-
-st.markdown("---")
-
-st.subheader("📊 Status")
-
-if st.session_state.documents_processed:
-    st.success("✅ Documents Ready")
-else:
-    st.warning("⚠️ No Documents Processed")
-
-# ============================================
 # MAIN PAGE
 # ============================================
 
-st.title("🤖 AI Assistant")
 
-st.caption(
-    "Chat with AI or upload PDF documents for document-based answers using RAG.")
-
-
-st.markdown("---")
 
 # ============================================
-# CHAT HISTORY
+# DISPLAY CHAT HISTORY
 # ============================================
 
-for message in st.session_state.messages:
-
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+render_chat(st.session_state.messages)
 
 # ============================================
-# USER INPUT
+# CHAT INPUT
 # ============================================
 
-question = st.chat_input(
-    "Ask me anything... or upload PDF documents for document-based answers."
-
-)
-
-
+question = st.chat_input("💬 Ask anything...")
 
 if question:
 
+    # Store user message
     st.session_state.messages.append(
         {
             "role": "user",
-            "content": question
+            "content": question,
         }
     )
 
-    with st.chat_message("user"):
-        st.markdown(question)
+    # Refresh UI immediately
+    st.rerun()
+
+# ============================================
+# GENERATE RESPONSE
+# ============================================
+
+if (
+    st.session_state.messages
+    and st.session_state.messages[-1]["role"] == "user"
+):
+
+    question = st.session_state.messages[-1]["content"]
 
     try:
 
-        with st.chat_message("assistant"):
+        with st.spinner("🤖 Thinking..."):
 
-            with st.spinner("Thinking..."):
+            result = ask_agent(
+                question,
+                st.session_state.documents_processed,
+            )
 
-                if st.session_state.documents_processed:
+            st.write("RESULT:", result)
+            st.write("TYPE:", type(result))
+ 
 
-                    rag_chain = load_rag_chain()
-                    answer = rag_chain.invoke(question)
 
-                else:
 
-                    chatbot = load_chatbot()
-                    answer = chatbot.invoke(question).content
-
-            st.markdown(answer)
+        answer = result["answer"]
+        source = result["source"]
 
         st.session_state.messages.append(
             {
                 "role": "assistant",
-                "content": answer
+                "content": answer,
+                "source": source,
             }
         )
 
+        st.rerun()
+
     except Exception as e:
 
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ {e}")
